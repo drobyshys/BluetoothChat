@@ -1,0 +1,6 @@
+I:\workspace\WORK\BluetoothChat\Application\build\intermediates\classes\debug
+I:\workspace\WORK\BluetoothChat\Application\build\intermediates\pre-dexed\debug\support-annotations-21.0.2-32413109fcfe9cb7cb8e443487d8b69438c2d969.jar
+I:\workspace\WORK\BluetoothChat\Application\build\intermediates\pre-dexed\debug\classes-1fb34fd0447e4d3b852f7e32f5e0c27c340b476c.jar
+I:\workspace\WORK\BluetoothChat\Application\build\intermediates\pre-dexed\debug\classes-0c54e26d795295014ca9ca77fba5151822fefd1d.jar
+I:\workspace\WORK\BluetoothChat\Application\build\intermediates\pre-dexed\debug\internal_impl-21.0.2-dec86263e0d487736e9878c4867b61892dc059ee.jar
+I:\workspace\WORK\BluetoothChat\Application\build\intermediates\pre-dexed\debug\classes-64071b25b25e36a8307d765d938ff91213f2fda7.jar
