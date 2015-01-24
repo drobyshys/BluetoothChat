@@ -292,39 +292,42 @@ public class BluetoothChatFragment extends Fragment {
                 case Constants.MESSAGE_END:
                     final File file = (File) msg.obj;
                     pb.setVisibility(View.GONE);
-                    mLog.append("\n" + "file received");
-                    DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
-                        @Override public void onClick(DialogInterface dialog, int which) {
-                            switch (which){
-                                case DialogInterface.BUTTON_POSITIVE:
-                                    try {
-                                        FileOpen.openFile(activity, file);
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
-                                    break;
-                                case DialogInterface.BUTTON_NEGATIVE:
-                                    //No button clicked
-                                    dialog.dismiss();
-                                    break;
+                    mLog.append("\n" + "file transfer end");
+                    if (file != null) {
+                        DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                switch (which) {
+                                    case DialogInterface.BUTTON_POSITIVE:
+                                        try {
+                                            FileOpen.openFile(activity, file);
+                                        } catch (IOException e) {
+                                            e.printStackTrace();
+                                        }
+                                        break;
+                                    case DialogInterface.BUTTON_NEGATIVE:
+                                        //No button clicked
+                                        dialog.dismiss();
+                                        break;
+                                }
                             }
-                        }
-                    };
+                        };
 
-                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-                    builder.setMessage("Open file?").setPositiveButton("Yes", dialogClickListener)
-                            .setNegativeButton("Cancel", dialogClickListener).show();
+                        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                        builder.setMessage("Open file?").setPositiveButton("Yes", dialogClickListener)
+                                .setNegativeButton("Cancel", dialogClickListener).show();
+                    }
                     break;
                 case Constants.MESSAGE_PERCENT:
                     pb.setProgress(msg.arg1);
                     break;
                 case Constants.MESSAGE_START:
                     pb.setVisibility(View.VISIBLE);
-                    mLog.append("\n" + "receiving file..");
+                    mLog.append("\n" + "file transfer start...");
                     break;
                 case Constants.MESSAGE_FILE_ERROR:
                     pb.setVisibility(View.GONE);
-                    mLog.append("\n" + "error receiving file..");
+                    mLog.append("\n" + "error file transfer");
                     break;
             }
         }

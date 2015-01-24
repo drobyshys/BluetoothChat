@@ -43,9 +43,12 @@ class ConnectedThread extends Thread {
         mmOutStream = tmpOut;
     }
 
+    byte[] sizeBuf = new byte[4];
+
     public void run() {
         Log.i(TAG, "BEGIN mConnectedThread");
         byte[] buffer = new byte[1024];
+
         int bytes;
 
         boolean fileRead = false;
@@ -59,41 +62,26 @@ class ConnectedThread extends Thread {
         while (true) {
             try {
 
-                if (fileRead && size > saved) {
-                    bytes = mmInStream.read(buffer);
-                    stream.write(buffer, 0, bytes);
-                    saved += bytes;
-                    int newPercent = (int) ((saved / size) / 100);
-                    if (newPercent != percent) {
-                        service.mHandler.obtainMessage(Constants.MESSAGE_PERCENT, percent, 0).sendToTarget();
-                    }
-                    if (saved == size)
-                        fileRead = false;
-                }
+                msgLen = readSize();
 
-                mmInStream.read(buffer, 0, 4);
-                msgLen = toInt(buffer);
+//                service.sendToast("log: msg lenght" + msgLen);
 
-                service.sendToast("log: msg lenght" + msgLen);
-
-                bytes = mmInStream.read(buffer, 0, msgLen);
-
-                String received = new String(buffer, 0, bytes);
+                readMsg(buffer, msgLen);
+                String received = new String(buffer, 0, msgLen);
 
                 if (received.equals(Constants.FILE_START)) {
                     saved = 0;
 
                     //file name
-                    mmInStream.read(buffer, 0, 4);
-                    msgLen = toInt(buffer);
-                    bytes = mmInStream.read(buffer, 0, msgLen);
-                    String name = new String(buffer, 0, bytes);
+                    msgLen = readSize();
+                    readMsg(buffer, msgLen);
+                    String name = new String(buffer, 0, msgLen);
                     service.sendToast("file : " + name);
 
                     //file size
                     mmInStream.read(buffer, 0, 8);
                     size = ByteBuffer.wrap(buffer).getLong();
-
+                    service.sendToast("log: size " + size);
                     //create file
                     file = new File(Environment.getExternalStorageDirectory()
                             .getAbsolutePath() + "/" + name);
@@ -104,23 +92,29 @@ class ConnectedThread extends Thread {
                     fileRead = true;
                 } else if (received.equals(Constants.FILE_END)) {
                     fileRead = false;
+                    saved = percent = 0;
                     stream.close();
                     service.mHandler.obtainMessage(Constants.MESSAGE_END, file).sendToTarget();
                     file = null;
                 } else if (received.equals(Constants.FILE_ERROR)) {
                     file = null;
+                    saved = percent = 0;
                     if (stream != null) stream.close();
                     if (fileRead) service.mHandler.obtainMessage(Constants.MESSAGE_FILE_ERROR).sendToTarget();
 
                     fileRead = false;
                 } else if (fileRead) {
-                    stream.write(buffer, 0, bytes);
-                    saved += bytes;
-                    service.mHandler.obtainMessage(Constants.MESSAGE_PERCENT, (int) ((saved / size) / 100), 0)
-                            .sendToTarget();
+                    stream.write(buffer, 0, msgLen);
+                    saved += msgLen;
+                    int newPerc =  (int) ((saved * 100 ) / size);
+                    if (newPerc != percent) {
+                        percent = newPerc;
+                        service.mHandler.obtainMessage(Constants.MESSAGE_PERCENT, newPerc, 0)
+                                .sendToTarget();
+                    }
                 } else {
                     // Send the obtained bytes to the UI Activity
-                    service.mHandler.obtainMessage(Constants.MESSAGE_READ, bytes, -1, buffer)
+                    service.mHandler.obtainMessage(Constants.MESSAGE_READ, msgLen, -1, buffer)
                             .sendToTarget();
                 }
 
@@ -140,6 +134,20 @@ class ConnectedThread extends Thread {
                 break;
             }
         }
+    }
+
+    private void readMsg(byte[] buffer, final int msgLen) throws IOException {
+        int bytes, all = 0, left = msgLen;
+        while (all != msgLen) {
+            bytes = mmInStream.read(buffer, all, left);
+            all += bytes;
+            left -= bytes;
+        }
+    }
+
+    private int readSize() throws IOException {
+        readMsg(sizeBuf, 4);
+        return toInt(sizeBuf);
     }
 
     public void writeMsg(byte[] buffer) {
@@ -191,28 +199,39 @@ class ConnectedThread extends Thread {
                 try {
                     stream = new FileInputStream(f);
                     byte[] buffer = new byte[1024];
-                    int readCount;
+                    int readCount, percent = 0;
                     write(Constants.FILE_START.getBytes());
                     service.sendToast("sending file " + f.getName());
 
                     write(f.getName().getBytes());  //filename
 
                     //file size in long
-                    ByteBuffer bb = ByteBuffer.allocate(8).putLong(f.length());
+                    long size = f.length();
+                    ByteBuffer bb = ByteBuffer.allocate(8).putLong(size);
                     mmOutStream.write(bb.array());   //write just long
 
+                    service.mHandler.obtainMessage(Constants.MESSAGE_START).sendToTarget();
+                    long writen = 0;
                     while ((readCount = stream.read(buffer)) != -1) {
                         write(buffer, readCount);
-                        try {
-                            Thread.sleep(150);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
+                        writen += readCount;
+//                        try {
+//                            Thread.sleep(150);
+//                        } catch (InterruptedException e) {
+//                            e.printStackTrace();
+//                        }
+                        int newPerc =  (int) ((writen * 100 ) / size);
+                        if (newPerc != percent) {
+                            percent = newPerc;
+                            service.mHandler.obtainMessage(Constants.MESSAGE_PERCENT, newPerc, 0)
+                                    .sendToTarget();
                         }
                     }
                     write(Constants.FILE_END.getBytes());
-                    service.sendToast("file sent");
+                    service.mHandler.obtainMessage(Constants.MESSAGE_END, null).sendToTarget();
                 } catch (Exception e) {
                     e.printStackTrace();
+                    service.mHandler.obtainMessage(Constants.MESSAGE_FILE_ERROR).sendToTarget();
                     try {
                         write(Constants.FILE_ERROR.getBytes());
                     } catch (IOException e1) {
