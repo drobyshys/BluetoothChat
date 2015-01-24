@@ -30,6 +30,7 @@ public interface Constants {
     public static final int MESSAGE_PERCENT = 6;
     public static final int MESSAGE_START = 7;
     public static final int MESSAGE_END = 8;
+    public static final int MESSAGE_FILE_ERROR= 9;
 
     // Key names received from the BluetoothChatService Handler
     public static final String DEVICE_NAME = "device_name";

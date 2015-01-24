@@ -17,8 +17,10 @@
 package com.example.android.bluetoothchat;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -35,15 +37,14 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
 
 
 /**
@@ -55,7 +56,6 @@ public class BluetoothChatFragment extends Fragment {
 
     // Intent request codes
     private static final int REQUEST_CONNECT_DEVICE_SECURE = 1;
-    private static final int REQUEST_CONNECT_DEVICE_INSECURE = 2;
     private static final int REQUEST_ENABLE_BT = 3;
     private static final int REQUEST_PICK_FILE = 4;
 
@@ -154,9 +154,6 @@ public class BluetoothChatFragment extends Fragment {
         pb = (ProgressBar) view.findViewById(R.id.pb);
     }
 
-    /**
-     * Set up the UI and background operations for chat.
-     */
     private void setupChat() {
         Log.d(TAG, "setupChat()");
 
@@ -190,9 +187,6 @@ public class BluetoothChatFragment extends Fragment {
         mOutStringBuffer = new StringBuffer("");
     }
 
-    /**
-     * Makes this device discoverable.
-     */
     private void ensureDiscoverable() {
         if (mBluetoothAdapter.getScanMode() !=
                 BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE) {
@@ -254,14 +248,16 @@ public class BluetoothChatFragment extends Fragment {
      */
     private final Handler mHandler = new Handler() {
         @Override
-        public void handleMessage(Message msg) {
-            FragmentActivity activity = getActivity();
+        public void handleMessage(final Message msg) {
+            final FragmentActivity activity = getActivity();
+            if (activity == null) {
+                return;
+            }
             switch (msg.what) {
                 case Constants.MESSAGE_STATE_CHANGE:
                     switch (msg.arg1) {
                         case BluetoothChatService.STATE_CONNECTED:
                             setStatus(getString(R.string.title_connected_to, mConnectedDeviceName));
-                            mLog.setText("");
                             break;
                         case BluetoothChatService.STATE_CONNECTING:
                             setStatus("connecting...");
@@ -287,10 +283,6 @@ public class BluetoothChatFragment extends Fragment {
                 case Constants.MESSAGE_DEVICE_NAME:
                     // save the connected device's name
                     mConnectedDeviceName = msg.getData().getString(Constants.DEVICE_NAME);
-                    if (null != activity) {
-                        Toast.makeText(activity, "Connected to "
-                                + mConnectedDeviceName, Toast.LENGTH_SHORT).show();
-                    }
                     break;
                 case Constants.MESSAGE_TOAST:
                     if (null != activity) {
@@ -298,8 +290,30 @@ public class BluetoothChatFragment extends Fragment {
                     }
                     break;
                 case Constants.MESSAGE_END:
+                    final File file = (File) msg.obj;
                     pb.setVisibility(View.GONE);
                     mLog.append("\n" + "file received");
+                    DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface dialog, int which) {
+                            switch (which){
+                                case DialogInterface.BUTTON_POSITIVE:
+                                    try {
+                                        FileOpen.openFile(activity, file);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                    break;
+                                case DialogInterface.BUTTON_NEGATIVE:
+                                    //No button clicked
+                                    dialog.dismiss();
+                                    break;
+                            }
+                        }
+                    };
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                    builder.setMessage("Open file?").setPositiveButton("Yes", dialogClickListener)
+                            .setNegativeButton("Cancel", dialogClickListener).show();
                     break;
                 case Constants.MESSAGE_PERCENT:
                     pb.setProgress(msg.arg1);
@@ -307,6 +321,10 @@ public class BluetoothChatFragment extends Fragment {
                 case Constants.MESSAGE_START:
                     pb.setVisibility(View.VISIBLE);
                     mLog.append("\n" + "receiving file..");
+                    break;
+                case Constants.MESSAGE_FILE_ERROR:
+                    pb.setVisibility(View.GONE);
+                    mLog.append("\n" + "error receiving file..");
                     break;
             }
         }
@@ -317,13 +335,7 @@ public class BluetoothChatFragment extends Fragment {
             case REQUEST_CONNECT_DEVICE_SECURE:
                 // When DeviceListActivity returns with a device to connect
                 if (resultCode == Activity.RESULT_OK) {
-                    connectDevice(data, true);
-                }
-                break;
-            case REQUEST_CONNECT_DEVICE_INSECURE:
-                // When DeviceListActivity returns with a device to connect
-                if (resultCode == Activity.RESULT_OK) {
-                    connectDevice(data, false);
+                    connectDevice(data);
                 }
                 break;
             case REQUEST_ENABLE_BT:
@@ -346,14 +358,14 @@ public class BluetoothChatFragment extends Fragment {
         }
     }
 
-    private void connectDevice(Intent data, boolean secure) {
+    private void connectDevice(Intent data) {
         // Get the device MAC address
         String address = data.getExtras()
                 .getString(DeviceListActivity.EXTRA_DEVICE_ADDRESS);
         // Get the BluetoothDevice object
         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
         // Attempt to connect to the device
-        mChatService.connect(device, secure);
+        mChatService.connect(device);
     }
 
     @Override
